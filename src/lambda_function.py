@@ -1,5 +1,6 @@
-from base64 import b64decode
 import logging
+from base64 import b64decode
+
 import boto3
 import requests
 
@@ -23,6 +24,15 @@ def is_comment(body):
     return body.has_key('comment')
 
 
+def is_changelog(body):
+    """
+
+    :param dict body:
+    :return: bool
+    """
+    return body.has_key('changelog')
+
+
 def parse_issue(body):
     """
     parse the info from the body and add it to a dictonary
@@ -32,8 +42,7 @@ def parse_issue(body):
     try:
         issue_key = body['issue']['key']
         issue_summary = body['issue']['fields']['summary']
-        issue_api_url = body['issue'][
-            'self']  # https://cloudar.atlassian.net/rest/api/2/issue/14703
+        issue_api_url = body['issue']['self']  # https://foobar.atlassian.net/rest/api/2/issue/14703
     except KeyError as e:
         logger.info('Required key is missing: %s' % e)
         raise AttributeError('Required key is missing')
@@ -42,23 +51,15 @@ def parse_issue(body):
     proto = url_parts[0]
     url_parts = url_parts[1].split('/')
     domain = url_parts[0]
-    url = '%(proto)s://%(domain)s/browse/%(key)s' % {'proto': proto, 'domain': domain,
-                                                     'key': issue_key}
+    url = '%(proto)s://%(domain)s/browse/%(key)s' % {'proto': proto, 'domain': domain, 'key': issue_key}
 
-    return {
-        'key': issue_key,
-        'summary': issue_summary,
-        'url': url,
-    }
+    return {'key': issue_key, 'summary': issue_summary, 'url': url}
 
 
 def post_to_slack(channel, fallback, pretext, title, text, issue_info, author, avatar):
-    data_dict = {
-        'author': author,
-        'avatar': avatar
-    }
+    data_dict = {'author': author, 'avatar': avatar}
 
-    for k,v in issue_info.iteritems():
+    for k, v in issue_info.iteritems():
         data_dict['issue_%s' % k] = v
 
     payload = {
@@ -127,7 +128,37 @@ def lambda_handler(event, context):
             author=author,
             avatar=avatar,
             text=comment,
-            issue_info=issue_info
+            issue_info=issue_info,
+        )
+
+    if is_changelog(body):
+        try:
+            author = body['user'].get('displayName', body['user'].get('Name'))
+            avatar = body['user']['avatarUrls']['16x16']
+            changes = []
+            for change in body['changelog']['items']:
+                changes.append({
+                    'from': change.get('fromString', change.get('from', None)),
+                    'to': change.get('toString', change.get('to', None)),
+                    'field': change.get('field', None),
+                })
+        except KeyError as e:
+            logger.info('Stopped processing, because required key is missing: %s' % e)
+            return
+
+        text = ''
+        for change in changes:
+            text += '%(field)s changed from %(from)s to %(to)s\n' % change
+
+        post_to_slack(
+            channel,
+            fallback='Field changed in %(issue_key)s: %(issue_summary)s by %(author) - %(issue_url)s',
+            pretext='Issue updated',
+            title='%(issue_key)s - %(issue_summary)s',
+            author=author,
+            avatar=avatar,
+            text=text,
+            issue_info=issue_info,
         )
 
     return
