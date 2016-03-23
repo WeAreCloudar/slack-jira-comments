@@ -96,9 +96,6 @@ def lambda_handler(event, context):
     if not body:
         body = event
 
-    logger.info('started function')
-    logger.info(body)
-
     # Validation
     webhook_event = body.get('webhookEvent')
     if not webhook_event == 'jira:issue_updated':
