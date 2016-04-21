@@ -120,7 +120,7 @@ def lambda_handler(event, context):
         post_to_slack(
             channel,
             fallback='New comment from %(author)s, on %(issue_key)s - %(issue_url)s',
-            pretext='New commend added',
+            pretext='New comment added',
             title='%(issue_key)s - %(issue_summary)s',
             author=author,
             avatar=avatar,
