@@ -62,20 +62,36 @@ def post_to_slack(channel, fallback, pretext, title, text, issue_info, author, a
     for k, v in issue_info.iteritems():
         data_dict['issue_%s' % k] = v
 
-    payload = {
-        'attachments': [
-            {
-                'fallback': fallback % data_dict,
-                'pretext': pretext % data_dict,
-                'author_name': author,
-                'author_icon': avatar,
-                'title': title % data_dict,
-                'title_link': data_dict.get('issue_url'),
-                'text': text % data_dict,
-            }
-        ]
-
-    }
+    try:
+        payload = {
+            'attachments': [
+                {
+                    'fallback': fallback % data_dict,
+                    'pretext': pretext % data_dict,
+                    'author_name': author,
+                    'author_icon': avatar,
+                    'title': title % data_dict,
+                    'title_link': data_dict.get('issue_url'),
+                    'text': text % data_dict,
+                }
+            ]
+        }
+    except TypeError as e:
+        logger.error("TypeError detected", exc_info=1)
+        logger.error({
+            'attachments': [
+                {
+                    'fallback': fallback,
+                    'pretext': pretext,
+                    'author_name': author,
+                    'author_icon': avatar,
+                    'data_dict': data_dict,
+                    'title': title,
+                    'text': text,
+                }
+            ]
+        })
+        raise e
 
     if channel is not None:
         payload['channel'] = '#%s' % channel
